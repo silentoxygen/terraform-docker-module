@@ -226,8 +226,6 @@ Concepts reinforced:
 - Inputs/outputs = clean contracts  
 - Modules encourage consistency, safety, and scalability  
 
-This is the natural upgrade path from Session 3 → Session 4.
-
 ---
 
 # 📘 End of README
