@@ -51,3 +51,24 @@ EOT
   type        = bool
   default     = false
 }
+
+variable "name" {
+  description = <<EOT
+The name of the container resource created by this module.
+This is passed into docker_container.this.name.
+EOT
+  type = string
+}
+
+variable "env" {
+  description = <<EOT
+Environment variables to pass into the container.
+Example:
+  env = {
+    FOO = "bar"
+    PORT = "8080"
+  }
+EOT
+  type    = map(string)
+  default = {}
+}
