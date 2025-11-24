@@ -1,10 +1,3 @@
-variable "container_name" {
-  description = <<EOT
-Name of the Docker container.
-EOT
-  type        = string
-}
-
 variable "image" {
   description = <<EOT
 Image to use for the container (e.g. nginx:latest).
