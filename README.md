@@ -1,117 +1,233 @@
-## Terraform Docker Module
+# 🚀 Terraform Modular Docker Stack (Session 4)
 
-This Terraform module creates a Docker image, a Docker container, and (optionally) a Docker network using the kreuzwerker/docker provider.
+This repository demonstrates how to transform **ad‑hoc Terraform** into **scalable, reusable, production‑grade Terraform systems**.
 
-It is intended for simple local deployments or CI runners where you want Terraform to manage a container lifecycle.
+It builds on the Session 3 multi‑resource Docker stack and introduces:
 
-Key features
-- create (or attach to) a Docker network
-- pull and manage a container image
-- create a container with port mapping and environment variables
+- 🌱 Root module vs feature modules  
+- 🧱 Reusable Docker **network** module  
+- 📦 Reusable Docker **container** module  
+- 🔌 Clear input/output contracts  
+- 🏗️ A scalable structure used by real SRE / Platform Engineering teams  
 
-## Contract
-- Inputs: container configuration (name, image, ports, env, network settings).
-- Outputs: container id/name and network information.
-- Error modes: fails if Docker daemon is unavailable, or if an existing network is referenced but missing when `create_network = false`.
+The stack provisions:
 
-## Requirements
-- Terraform >= 1.5.0
-- Provider: `kreuzwerker/docker` >= 3.0.0
-- Access to a Docker daemon (local socket or remote daemon) from where you run Terraform.
+- 🕸️ One Docker **network** (`app_network`)
+- ⚙️ One **backend** container  
+- 🎨 One **frontend** container  
 
-The module's provider requirement is declared in the module, but you must configure the provider block in your root module (example below).
+---
 
-## Inputs
+## 🔧 Requirements
 
-Required inputs
-- `name` (string) — Name of the Docker container.
-- `image` (string) — Docker image to run (for example `nginx:latest`).
-- `internal_port` (number) — Port inside the container that the app listens on.
-- `external_port` (number) — Port on the host to map to the internal port.
+| Name      | Version                      |
+|-----------|------------------------------|
+| terraform | ≥ 1.5.0                      |
+| docker    | Local Docker Engine running  |
+| provider  | kreuzwerker/docker ≥ 3.0.0   |
 
-Optional inputs (with defaults)
-- `env` (list(string), default = []) — Optional list of environment variables in `KEY=VALUE` form.
-- `create_network` (bool, default = true) — Whether this module should create a Docker network. If `false`, the module will attach the container to the network named by `network_name` and will not create a network resource.
-- `network_name` (string, default = "app_network") — Name of the Docker network. If `create_network = true` this is the name that will be created; if `create_network = false` this must be the name of an existing network.
-- `keep_image_locally` (bool, default = false) — Whether Docker should keep the pulled image locally when the container is destroyed.
+---
 
-Notes on required vs optional
-- The module requires `name`, `image`, `internal_port`, and `external_port` because they have no defaults. All other inputs are optional with sensible defaults.
+## 📁 Project Structure
 
-## Outputs
-- `container_id` — ID of the created container.
-- `container_name` — Name of the created container.
-- `network_name` — Name of the network the container is attached to (either the created network or the provided `network_name`).
-- `network_id` — ID of the network created by this module, or `null` when using an existing network (`create_network = false`).
+```text
+session4-modules/
+├── main.tf
+├── variables.tf
+├── outputs.tf
+├── versions.tf
+├── provider.tf
+└── modules/
+    ├── network/
+    │   ├── main.tf
+    │   ├── variables.tf
+    │   └── outputs.tf
+    └── container/
+        ├── main.tf
+        ├── variables.tf
+        └── outputs.tf
+```
 
-## Example usage
+---
 
-Basic example (create network + container)
+# 🌿 Root Module
+
+The **root module** orchestrates the overall environment by combining the network module and two container modules.
+
+---
+
+## 🔢 Root Inputs
+
+All root‑level variables have defaults → **none are required**.
+
+### Optional Inputs
+
+| Name            | Type   | Default                     | Description                          |
+|-----------------|--------|-----------------------------|--------------------------------------|
+| backend_image   | string | "nginxdemos/hello:latest"   | Image used for backend container     |
+| frontend_image  | string | "nginx:latest"              | Image used for frontend container    |
+
+Override via CLI:
+
+```bash
+terraform apply -var="backend_image=nginxdemos/hello:plain-text"
+```
+
+Or via `terraform.tfvars`:
 
 ```hcl
-provider "docker" {
-  # Example: local socket
-  host = "unix:///var/run/docker.sock"
-  # Or for remote daemon:
-  # host = "tcp://192.0.2.10:2376"
+backend_image  = "nginxdemos/hello:plain-text"
+frontend_image = "nginx:1.27.0"
+```
+
+---
+
+## 📤 Root Outputs
+
+| Name          | Description                            |
+|---------------|----------------------------------------|
+| frontend_url  | Local URL for the frontend container   |
+| backend_url   | Local URL for the backend container    |
+| network_name  | Name of the Docker network             |
+
+---
+
+# 🕸️ Module: network
+
+Reusable module that creates a Docker network.
+
+### Example usage
+
+```hcl
+module "network" {
+  source = "./modules/network"
+  name   = "app_network"
+}
+```
+
+---
+
+## 🔐 Network Inputs
+
+| Name | Type   | Default | Required | Description               |
+|------|--------|---------|----------|---------------------------|
+| name | string | n/a     | yes      | Name of the Docker network |
+
+---
+
+## 📤 Network Outputs
+
+| Name | Description            |
+|------|------------------------|
+| id   | ID of the network      |
+| name | Name of the network    |
+
+---
+
+# 📦 Module: container
+
+Reusable module responsible for:
+
+- Pulling a Docker image
+- Creating a container
+- Attaching the container to a network
+
+It is used **twice**: once for backend, once for frontend.
+
+### Example usage
+
+```hcl
+module "backend" {
+  source        = "./modules/container"
+  name          = "backend"
+  image         = var.backend_image
+  internal_port = 80
+  external_port = 9000
+  network_name  = module.network.name
 }
 
-module "web" {
-  source        = "../../module-local/modules/docker-module"
-  name          = "my-web"
-  image         = "nginx:latest"
+module "frontend" {
+  source        = "./modules/container"
+  name          = "frontend"
+  image         = var.frontend_image
   internal_port = 80
   external_port = 8080
-  env           = ["ENV=production", "LOG_LEVEL=info"]
-  # create_network defaults to true; network_name defaults to "app_network"
+  network_name  = module.network.name
 }
 ```
 
-Example: attach to an existing network
+---
 
-```hcl
-module "worker" {
-  source        = "../../module-local/modules/docker-module"
-  name          = "worker-1"
-  image         = "alpine:latest"
-  internal_port = 8080
-  external_port = 18080
-  create_network = false
-  network_name   = "preexisting_network"
-}
-```
+## 🔐 Container Inputs (all required)
 
-## Edge cases & notes
-- If `create_network = false` and `network_name` does not exist, the `docker_container` resource will fail to attach; create the network manually or set `create_network = true`.
-- `network_id` output will be `null` when `create_network = false` (module didn't create a network resource).
-- If the Docker daemon is unreachable or the configured `host` is incorrect, `terraform plan/apply` will fail.
-- `keep_image_locally = true` prevents Terraform's docker provider from removing the image when the container is destroyed; useful for caching images in CI.
+| Name           | Type   | Default | Required | Description                                |
+|----------------|--------|---------|----------|--------------------------------------------|
+| name           | string | n/a     | yes      | Name of the container                      |
+| image          | string | n/a     | yes      | Docker image                               |
+| internal_port  | number | n/a     | yes      | Container's internal port                  |
+| external_port  | number | n/a     | yes      | Port to expose on host                     |
+| network_name   | string | n/a     | yes      | Name of Docker network to attach container |
 
-## Testing / Quick start
-1. Initialize Terraform in your root module directory:
+---
+
+## 📤 Container Outputs
+
+| Name           | Description                        |
+|----------------|------------------------------------|
+| container_id   | ID of the created container        |
+| container_name | Name of the container              |
+
+---
+
+# ▶️ Usage
+
+Initialize and deploy:
 
 ```bash
 terraform init
-```
-
-2. Apply the example configuration (review plan first):
-
-```bash
 terraform plan
 terraform apply
 ```
 
-3. Destroy when done:
+Check running containers:
 
 ```bash
-terraform destroy
+docker ps
 ```
 
-## Troubleshooting
-- Permission errors talking to the Docker socket are usually solved by running with a user that can access `/var/run/docker.sock`, or by configuring a remote Docker daemon and proper TLS credentials.
-- Provider version mismatches: the module declares `kreuzwerker/docker` >= 3.0.0; if you have a global lockfile or other provider constraints, ensure compatibility.
+Test endpoints:
 
-## Acknowledgements
-This module is a lightweight wrapper around the `kreuzwerker/docker` provider to make simple container lifecycles reproducible from Terraform.
+```bash
+curl http://localhost:8080   # frontend
+curl http://localhost:9000   # backend
+```
 
-If you want additional features (volumes, healthchecks, complex networking, multiple containers), open an issue or extend the module by adding variables and resources.
+Test internal DNS:
+
+```bash
+docker exec -it frontend ping backend
+```
+
+---
+
+# 🎓 Teaching Notes
+
+This repository demonstrates the evolution from a simple multi‑resource Terraform setup into a **modular architecture** suitable for:
+
+- SRE teams  
+- Platform engineering  
+- Cloud automation  
+- Multi‑environment deployment patterns  
+
+Concepts reinforced:
+
+- Root module = orchestration  
+- Feature modules = reusable building blocks  
+- Inputs/outputs = clean contracts  
+- Modules encourage consistency, safety, and scalability  
+
+This is the natural upgrade path from Session 3 → Session 4.
+
+---
+
+# 📘 End of README
