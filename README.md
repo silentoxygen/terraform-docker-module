@@ -1,4 +1,4 @@
-# 🚀 Terraform Modular Docker Stack (Session 4)
+# 🚀 Terraform Modular Docker Stack
 
 This repository demonstrates how to transform **ad‑hoc Terraform** into **scalable, reusable, production‑grade Terraform systems**.
 
