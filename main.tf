@@ -45,17 +45,7 @@ resource "docker_container" "this" {
     external = var.external_port
   }
 
-  dynamic "env" {
-    for_each = var.env
-    content {
-      # env.value is like "KEY=VALUE"
-      # Using content block only because dynamic requires it
-      # This is equivalent to env = ["A=B", "C=D"]
-      # but allows users to pass a list.
-      # Terraform will map this to ENV vars inside the container.
-      value = env.value
-    }
-  }
+  env = var.env
 
   networks_advanced {
     name = local.effective_network_name
