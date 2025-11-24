@@ -62,13 +62,18 @@ EOT
 
 variable "env" {
   description = <<EOT
-Environment variables to pass into the container.
-Example:
-  env = {
-    FOO = "bar"
-    PORT = "8080"
-  }
+A set of environment variables to pass into the container.
+
+Each entry must be of the form "KEY=VALUE", for example:
+
+  [
+    "PORT=8080",
+    "DEBUG=false"
+  ]
+
+This is passed directly into docker_container.this.env.
 EOT
-  type        = map(string)
-  default     = {}
+  type        = set(string)
+  default     = []
 }
+
