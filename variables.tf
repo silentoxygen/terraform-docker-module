@@ -57,7 +57,7 @@ variable "name" {
 The name of the container resource created by this module.
 This is passed into docker_container.this.name.
 EOT
-  type = string
+  type        = string
 }
 
 variable "env" {
@@ -69,6 +69,6 @@ Example:
     PORT = "8080"
   }
 EOT
-  type    = map(string)
-  default = {}
+  type        = map(string)
+  default     = {}
 }
